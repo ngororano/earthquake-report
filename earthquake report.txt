@@ -1,0 +1,242 @@
+package com.example.user.earthquake_report;
+
+import android.content.Context;
+import android.text.TextUtils;
+import android.util.Log;
+
+import com.android.volley.toolbox.JsonObjectRequest;
+import com.example.user.earthquake_report.models.EarthquakeData;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.UnsupportedEncodingException;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLConnection;
+import java.net.URLEncoder;
+import java.nio.charset.Charset;
+import java.util.ArrayList;
+
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.StringRequest;
+import com.android.volley.toolbox.Volley;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public class QeuryUtils {
+
+    private static final String TAG = "QeuryUtils";
+
+
+    public static ArrayList<EarthquakeData> fetchDataFromInternet (String strUrl) {
+
+        Log.e(TAG, "fetchDataFromInternet: fetching data from the internet");
+
+        ArrayList<EarthquakeData> earthquakeData = null;
+
+        try {
+            URL url = createUrl(strUrl);
+            String jsonResponse = makeHTTPRequest(url);
+            earthquakeData = extractFeatureFromJSON(jsonResponse);
+        }catch (Exception e) {
+            Log.e(TAG, "fetchDataFromInternet: there is an exception : " + e.getMessage());
+        }
+
+        return earthquakeData;
+    }
+
+    public static void sendDataToTheServer(String postUrl, String dataRetrieved, Context context) {
+
+
+
+        RequestQueue MyRequestQueue = Volley.newRequestQueue(context);
+
+        String url = "https://secure-bayou-83035.herokuapp.com/api/genres";
+        StringRequest MyStringRequest = new StringRequest(Request.Method.POST, url, new Response.Listener<String>() {
+            @Override
+            public void onResponse(String response) {
+                //This code is executed if the server responds, whether or not the response contains data.
+                //The String 'response' contains the server's response.
+                Log.e(TAG, "onResponse: there is a response");
+            }
+        }, new Response.ErrorListener() { //Create an error listener to handle errors appropriately.
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                //This code is executed if there is an error.
+                Log.e(TAG, "onErrorResponse: there is an error in responding");
+            }
+        }) {
+            protected Map<String, String> getParams() {
+                Map<String, String> MyData = new HashMap<String, String>();
+                MyData.put("name", "New Genre"); //Add the data you'd like to send to the server.
+                return MyData;
+            }
+        };
+
+        MyRequestQueue.add(MyStringRequest);
+    }
+
+    public static void fetchData(String getUrl, Context context) {
+        Log.e(TAG, "fetchDataFromInternet: fetching data from the internet");
+        ArrayList<EarthquakeData> earthquakeData = null;
+
+        try {
+            // Instantiate the RequestQueue.
+            RequestQueue queue = Volley.newRequestQueue(context);
+            String url = getUrl;
+
+            // Request a string response from the provided URL.
+            StringRequest stringRequest = new StringRequest(Request.Method.GET, url,
+                    new Response.Listener<String>() {
+                        @Override
+                        public void onResponse(String response) {
+                            // Display the first 500 characters of the response string.
+                            Log.e(TAG, "onResponse: amily the response is : " + response );
+                        }
+                    }, new Response.ErrorListener() {
+                @Override
+                public void onErrorResponse(VolleyError error) {
+                    Log.e(TAG, "onErrorResponse: that didn't work amily");
+                }
+            });
+
+// Add the request to the RequestQueue.
+            queue.add(stringRequest);
+        } catch (Exception e) {
+            Log.e(TAG, "fetchData: there is an exception" + e.getMessage());
+        }
+
+    }
+
+    private static URL createUrl (String strUrl) {
+        if(strUrl == null)
+            return null;
+
+        try {
+            URL url = new URL(strUrl);
+            return url;
+        } catch(MalformedURLException e) {
+
+        }
+        return null;
+    }
+
+    private static String makeHTTPRequest (URL url) throws IOException{
+        HttpURLConnection urlConnection = null;
+        InputStream inputStream = null;
+
+        if(url == null)
+            return null;
+        try {
+            urlConnection = (HttpURLConnection) url.openConnection();
+            urlConnection.setRequestMethod("GET");
+            urlConnection.setReadTimeout(10000);
+            urlConnection.setConnectTimeout(15000);
+            urlConnection.connect();
+
+            if(urlConnection.getResponseCode() == 200) {
+                inputStream = urlConnection.getInputStream();
+                String jsonResponse = readFromStream(inputStream);
+                return jsonResponse;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "makeHTTPRequest: There is an exception : " + e.getMessage());
+        }
+        finally {
+            if(urlConnection != null)
+                urlConnection.disconnect();
+            if(inputStream != null)
+                inputStream.close();
+        }
+        return  null;
+    }
+
+    private static String readFromStream (InputStream inputStream) {
+
+        if(inputStream == null)
+            return null;
+        try {
+            StringBuilder output = new StringBuilder();
+            InputStreamReader inputStreamReader = new InputStreamReader(inputStream, Charset.forName("UTF-8"));
+            BufferedReader reader = new BufferedReader(inputStreamReader);
+            String line = reader.readLine();
+            while (line != null) {
+                output.append(line);
+                line = reader.readLine();
+            }
+            return output.toString();
+        }catch (Exception e) {
+
+        }
+        return null;
+    }
+
+    private static ArrayList<EarthquakeData> extractFeatureFromJSON (String jsonResponse) {
+
+        if(TextUtils.isEmpty(jsonResponse))
+            return null;
+
+        ArrayList<EarthquakeData> earthquakelist = new ArrayList<>();
+
+
+        try {
+//            JSONObject rootObject = new JSONObject(jsonResponse);
+//            JSONArray featuresArray = rootObject.getJSONArray("features");
+//
+//            for(int i = 0; i < featuresArray.length(); i++) {
+//                JSONObject objects = featuresArray.getJSONObject(i);
+//                JSONObject properties = objects.getJSONObject("properties");
+//
+//                double magnitude = properties.getDouble("mag");
+//                String place = properties.getString("place");
+//                long time = properties.getLong("time");
+//
+//                String realMagnitude = "" + magnitude;
+//                SimpleDateFormat formatter = new SimpleDateFormat("dd/MM/yyyy hh:mm:ss");
+//                String realTime = formatter.format(new Date(time));
+//
+//                String url = properties.getString("url");
+//
+//                earthquakelist.add(new EarthquakeData(realMagnitude, place, realTime, url));
+
+
+            JSONArray rootArray = new JSONArray(jsonResponse);
+
+            Log.e(TAG, "extractFeatureFromJSON: the root array is : " + rootArray);
+
+            for(int i = 0; i < rootArray.length(); i++) {
+                JSONObject objects = rootArray.getJSONObject(i);
+
+                String genreName = objects.getString("name");
+                Log.e(TAG, "extractFeatureFromJSON: the genre name retrieved is : " + genreName);
+
+//                String realMagnitude = "" + magnitude;
+//                SimpleDateFormat formatter = new SimpleDateFormat("dd/MM/yyyy hh:mm:ss");
+//                String realTime = formatter.format(new Date(time));
+//
+//                String url = properties.getString("url");
+
+                earthquakelist.add(new EarthquakeData("15", genreName, "", ""));
+            }
+        } catch (Exception e) {
+
+        }
+        return earthquakelist;
+    }
+}
